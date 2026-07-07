@@ -1,135 +1,68 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-contract CertificadosBlockchain {
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-    address public administrador;
+contract AcademicCertificates is Ownable, ReentrancyGuard {
 
     struct Certificado {
-        uint id;
-        string nombreEstudiante;
-        string nombreCurso;
-        string institucion;
-        string hashDocumento;
-        address emisor;
-        uint fechaEmision;
-        bool valido;
+        uint256 idCertificado;
+        string nombreGraduado;
+        bytes32 hashContenido;
+        bool activo;
     }
 
-    uint public contadorCertificados;
+    mapping(address => Certificado) public certificados;
 
-    mapping(uint => Certificado) public certificados;
-    mapping(string => bool) public hashRegistrado;
-    mapping(address => bool) public emisoresAutorizados;
+    event CertificadoEmitido(address indexed studentWallet, uint256 idCertificado, bytes32 hashContenido);
+    event CertificadoInvalidado(address indexed studentWallet, uint256 idCertificado);
 
-    event CertificadoEmitido(
-        uint id,
-        string nombreEstudiante,
-        string nombreCurso,
-        string hashDocumento,
-        address emisor
-    );
-
-    event CertificadoRevocado(uint id);
-    event EmisorAutorizado(address emisor);
-    event EmisorEliminado(address emisor);
-
-    constructor() {
-        administrador = msg.sender;
-        emisoresAutorizados[msg.sender] = true;
-    }
-
-    modifier soloAdministrador() {
-        require(msg.sender == administrador, "Solo el administrador puede realizar esta accion");
-        _;
-    }
-
-    modifier soloEmisorAutorizado() {
-        require(emisoresAutorizados[msg.sender], "No eres un emisor autorizado");
-        _;
-    }
-
-    function autorizarEmisor(address _emisor) public soloAdministrador {
-        emisoresAutorizados[_emisor] = true;
-        emit EmisorAutorizado(_emisor);
-    }
-
-    function eliminarEmisor(address _emisor) public soloAdministrador {
-        emisoresAutorizados[_emisor] = false;
-        emit EmisorEliminado(_emisor);
-    }
+    constructor() Ownable(msg.sender) {}
 
     function emitirCertificado(
-        string memory _nombreEstudiante,
-        string memory _nombreCurso,
-        string memory _institucion,
-        string memory _hashDocumento
-    ) public soloEmisorAutorizado {
+        address studentWallet,
+        uint256 idCertificado,
+        string memory nombreGraduado,
+        bytes32 hashContenido
+    ) external onlyOwner nonReentrant {
 
-        require(bytes(_nombreEstudiante).length > 0, "Debe ingresar el nombre del estudiante");
-        require(bytes(_nombreCurso).length > 0, "Debe ingresar el nombre del curso");
-        require(bytes(_institucion).length > 0, "Debe ingresar la institucion");
-        require(bytes(_hashDocumento).length > 0, "Debe ingresar el hash del documento");
-        require(!hashRegistrado[_hashDocumento], "Este certificado ya fue registrado");
+        require(studentWallet != address(0), "Wallet invalida");
+        require(certificados[studentWallet].idCertificado == 0, "La wallet ya posee un certificado");
+        require(hashContenido != bytes32(0), "Hash invalido");
 
-        contadorCertificados++;
+        certificados[studentWallet] = Certificado({
+            idCertificado: idCertificado,
+            nombreGraduado: nombreGraduado,
+            hashContenido: hashContenido,
+            activo: true
+        });
 
-        certificados[contadorCertificados] = Certificado(
-            contadorCertificados,
-            _nombreEstudiante,
-            _nombreCurso,
-            _institucion,
-            _hashDocumento,
-            msg.sender,
-            block.timestamp,
-            true
-        );
-
-        hashRegistrado[_hashDocumento] = true;
-
-        emit CertificadoEmitido(
-            contadorCertificados,
-            _nombreEstudiante,
-            _nombreCurso,
-            _hashDocumento,
-            msg.sender
-        );
+        emit CertificadoEmitido(studentWallet, idCertificado, hashContenido);
     }
 
-    function verificarCertificado(uint _id) public view returns (
-        string memory nombreEstudiante,
-        string memory nombreCurso,
-        string memory institucion,
-        string memory hashDocumento,
-        address emisor,
-        uint fechaEmision,
-        bool valido
-    ) {
-        require(_id > 0 && _id <= contadorCertificados, "Certificado no existe");
+    function invalidarCertificado(address studentWallet) external onlyOwner nonReentrant {
+        require(certificados[studentWallet].activo == true, "No existe un certificado activo para esta wallet");
 
-        Certificado memory cert = certificados[_id];
+        certificados[studentWallet].activo = false;
 
-        return (
-            cert.nombreEstudiante,
-            cert.nombreCurso,
-            cert.institucion,
-            cert.hashDocumento,
-            cert.emisor,
-            cert.fechaEmision,
-            cert.valido
-        );
+        emit CertificadoInvalidado(studentWallet, certificados[studentWallet].idCertificado);
     }
 
-    function verificarPorHash(string memory _hashDocumento) public view returns (bool) {
-        return hashRegistrado[_hashDocumento];
-    }
+    function verificarCertificado(address studentWallet)
+        external
+        view
+        returns (
+            uint256 idCertificado,
+            string memory nombreGraduado,
+            bytes32 hashContenido,
+            bool activo
+        )
+    {
+        require(certificados[studentWallet].activo == true, "No existe un certificado activo para esta wallet");
 
-    function revocarCertificado(uint _id) public soloAdministrador {
-        require(_id > 0 && _id <= contadorCertificados, "Certificado no existe");
-        require(certificados[_id].valido, "El certificado ya esta revocado");
+        Certificado memory cert = certificados[studentWallet];
 
-        certificados[_id].valido = false;
-
-        emit CertificadoRevocado(_id);
+        return (cert.idCertificado, cert.nombreGraduado, cert.hashContenido, cert.activo);
     }
 }
