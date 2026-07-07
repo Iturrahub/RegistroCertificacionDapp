@@ -2,8 +2,7 @@
 
 ## Descripción
 
-Este proyecto corresponde a la Evaluación Final Transversal de la
-asignatura **Fundamentos de Blockchain**.
+Este proyecto corresponde al examen transversal de **Fundamentos de Blockchain**.
 
 La aplicación consiste en una **DApp (Aplicación Descentralizada)** que
 permite emitir, verificar y revocar certificados académicos mediante un
@@ -63,11 +62,8 @@ README.md
 ## Integrantes
 
 -   Diego Iturra
--   Integrante 2
--   Integrante 3
 
 ## Asignatura
 
 Fundamentos de Blockchain
 
-Duoc UC
